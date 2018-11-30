@@ -1119,6 +1119,7 @@ class cADFSDeviceRegistration {
     }
 }
 
+# Find-Certificate is copied from https://github.com/PowerShell/CertificateDsc (MIT)
 <#
     .SYNOPSIS
     Locates one or more certificates using the passed certificate selector parameters.
@@ -1200,10 +1201,7 @@ function Find-Certificate {
     $certPath = Join-Path -Path 'Cert:\LocalMachine' -ChildPath $Store
 
     if (-not (Test-Path -Path $certPath)) {
-        # The Certificte Path is not valid
-        New-InvalidArgumentError `
-            -ErrorId 'CannotFindCertificatePath' `
-            -ErrorMessage ($LocalizedData.CertificatePathError -f $certPath)
+        throw [System.ArgumentException]::New("Certificate Path '$certPath' is not valid");
     } # if
 
     # Assemble the filter to use to select the certificate
@@ -1243,8 +1241,8 @@ function Find-Certificate {
     # Join all the filters together
     $certFilterScript = '(' + ($certFilters -join ' -and ') + ')'
 
-    Write-Verbose -Message ($LocalizedData.SearchingForCertificateUsingFilters `
-            -f $store, $certFilterScript)
+    Write-Verbose -Message ("Looking for certificate in Path {0} using filter '{1}'" `
+            -f $certPath, $certFilterScript)
 
     $certs = Get-ChildItem -Path $certPath |
         Where-Object -FilterScript ([ScriptBlock]::Create($certFilterScript))
