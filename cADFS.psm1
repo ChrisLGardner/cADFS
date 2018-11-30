@@ -568,15 +568,15 @@ class cADFSSamlEndpoint {
     [DscProperty()]
     [Ensure] $Ensure;
 
-    ### The Name property must be unique to each ADFS Relying Party application in a farm.
-    [DscProperty(Key)]
+    ### References the ADFS Relying Party in which to install this SAMLEndpoint
+    [DscProperty(Mandatory)]
     [string] $Name;
 
     ### Binding type (POST, Redirect, Artifact)
     [DscProperty(Mandatory)]
     [SAMLBinding] $Binding;
 
-    ### Index of the Endpoint
+    ### Index of the Endpoint, relative to the Protocol
     [DscProperty(Key)]
     [Int] $Index;
 
@@ -588,7 +588,7 @@ class cADFSSamlEndpoint {
     [DscProperty(Mandatory)]
     [String] $Location;
 
-    ### SAML Protocol that this endpoint implements
+    ### SAML Protocol that this endpoint implements (SAMLAssertionConsumer, SAMLLogout etc.)
     [DscProperty(Key)]
     [SAMLProtocol] $Protocol;
 
@@ -598,9 +598,9 @@ class cADFSSamlEndpoint {
         $AllCurrentSAMLEndpoints = (Get-AdfsRelyingPartyTrust -Name $this.Name).SamlEndpoints;
         Write-Verbose -Message 'Finished retrieving list of all current SAML Endpoints for the ADFS Relying Party Trust';
 
-        Write-Verbose -Message 'Starting retrieving SAML Endpoint at Index $this.Index';
-        $CurrentSAMLEndpoint = $AllCurrentSAMLEndpoints | Where-Object { $_.Index -eq $this.Index };
-        Write-Verbose -Message 'Finished retrieving SAML Endpoint at Index $this.Index';
+        Write-Verbose -Message "Starting retrieving SAML Endpoint at $($this.Protocol) / $($this.Index)";
+        $CurrentSAMLEndpoint = $AllCurrentSAMLEndpoints | Where-Object { $_.Protocol -eq $this.Protocol -and $_.Index -eq $this.Index };
+        Write-Verbose -Message "Finished retrieving SAML Endpoint";
 
         $this.Binding = $CurrentSAMLEndpoint.Binding;
         $this.Index = $CurrentSAMLEndpoint.Index;
@@ -617,7 +617,7 @@ class cADFSSamlEndpoint {
         Write-Verbose -Message 'Starting evaluating SAML Endpoint against desired state.';
 
         $AllCurrentSAMLEndpoints = (Get-AdfsRelyingPartyTrust -Name $this.Name).SamlEndpoints;
-        $CurrentSAMLEndpoint = $AllCurrentSAMLEndpoints | Where-Object { $_.Index -eq $this.Index };
+        $CurrentSAMLEndpoint = $AllCurrentSAMLEndpoints | Where-Object { $_.Protocol -eq $this.Protocol -and $_.Index -eq $this.Index };
 
         ### Assume that the system is complian, unless one of the specific settings does not match.
         $Compliance = $true;
@@ -651,25 +651,25 @@ class cADFSSamlEndpoint {
             Binding = $this.Binding;
             Uri = $this.Location;
             Protocol = $this.Protocol;
+            Index = $this.Index;
         }
         if ($this.IsDefault) {
             $SAMLEndpoint.Add('IsDefault', $this.IsDefault);
         }
 
         $ReplacementSAMLEndpoint = New-AdfsSamlEndpoint @SAMLEndpoint;
-
-        $AllNewSAMLEndpoints = @();
-        $AllCurrentSAMLEndpoints = (Get-AdfsRelyingPartyTrust -Name $this.Name).SamlEndpoints;
-        ForEach ($CurrentSAMLEndpoint in $AllCurrentSAMLEndpoints) {
-            If ($CurrentSAMLEndpoint.Index -eq $this.Index) {
-                $AllNewSAMLEndpoints += $ReplacementSAMLEndpoint;
-            } Else {
-                $AllNewSAMLEndpoints += $CurrentSAMLEndpoint;
-            }
+        $AllSAMLEndpoints = (Get-AdfsRelyingPartyTrust -Name $this.Name).SamlEndpoints;
+        [object[]] $OtherSAMLEndpoints = $AllSAMLEndpoints | where-object { $_.Protocol -ne $this.Protocol -or $_.Index -ne $this.Index };
+        if ($AllSAMLEndpoints.length -ne $OtherSAMLEndpoints.length) {
+            Write-Verbose -Message 'Replacing existing SAML Endpoint';
+        } else {
+            Write-Verbose -Message 'Adding new SAML Endpoint';
         }
+        $NewSAMLEndpoints = $OtherSAMLEndpoints
+        $NewSAMLEndpoints += $ReplacementSAMLEndpoint;
 
-        Set-AdfsRelyingPartyTrust -TargetName $this.Name -SamlEndpoint $AllNewSAMLEndpoints;
-        Write-Verbose -Message 'Finished setting ADFS Global Authentication configuration.';
+        Set-AdfsRelyingPartyTrust -TargetName $this.Name -SamlEndpoint $NewSAMLEndpoints;
+        Write-Verbose -Message 'Finished setting SAML Endpoint configuration.';
     }
 }
 #endregion
