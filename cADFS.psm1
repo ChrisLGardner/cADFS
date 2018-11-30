@@ -358,6 +358,34 @@ class cADFSRelyingPartyTrust {
     [DscProperty()]
     [string] $AccessControlPolicyName;
 
+    ### Thumbprint of a certificate already present in the LocalMachine\My store.
+    ### Set the property to the empty string to remove the certificate ($null means unmanaged).
+    ### Specifies the certificate to be used for encrypting claims that are
+    ### issued to this relying party. Encrypting claims is optional.
+    [DscProperty()]
+    [string] $EncryptionCertificateThumbprint;
+
+    ### Thumbprints of certificates already present in the LocalMachine\My store.
+    ### Specifies certificates that are used to verify the signature on a request from the relying party.
+    ### NB: this singular property actually expects an array, just like the underlying AdfsRelyingPartyTrust.
+    [DscProperty()]
+    [string[]] $RequestSigningCertificateThumbprint;
+
+    ### Ignore the SSO cookie from previous succesful authentication, always re-authenticate users.
+    ### More information: https://blog.msresource.net/2016/07/07/active-directory-federation-services-adfs-single-sign-on-sso-and-token-lifetime-settings/
+    [DscProperty()]
+    [bool] $AlwaysRequireAuthentication;
+
+    ### Indicates whether the relying party requires that the NameID claim be encrypted.
+    [DscProperty()]
+    [bool] $EncryptedNameIdRequired;
+
+    ### Indicates whether the Federation Service requires signed SAML protocol
+    ### requests from the relying party. If you specify a value of $True, the
+    ### Federation Service rejects unsigned SAML protocol requests.
+    [DscProperty()]
+    [bool] $SignedSamlRequestsRequired;
+
     [cADFSRelyingPartyTrust] Get() {
         $this.CheckDependencies();
 
@@ -380,6 +408,11 @@ class cADFSRelyingPartyTrust {
         $this.Notes = $RelyingPartyTrust.Notes;
         $this.Identifier = $RelyingPartyTrust.Identifier;
         $this.AccessControlPolicyName = $RelyingPartyTrust.AccessControlPolicyName;
+        $this.EncryptionCertificateThumbprint = Get-OptCertificateThumbprint $RelyingPartyTrust.EncryptionCertificate;
+        $this.RequestSigningCertificateThumbprint = $RelyingPartyTrust.RequestSigningCertificate | Foreach-Object { $_.Thumbprint };
+        $this.AlwaysRequireAuthentication = $RelyingPartyTrust.AlwaysRequireAuthentication;
+        $this.EncryptedNameIdRequired = $RelyingPartyTrust.EncryptedNameIdRequired;
+        $this.SignedSamlRequestsRequired = $RelyingPartyTrust.SignedSamlRequestsRequired;
 
         return $this;
     }
@@ -459,6 +492,28 @@ class cADFSRelyingPartyTrust {
             Write-Verbose -Message ('The current AccessControlPolicyName property value ({0}) does not match the desired configuration ({1}).' -f $RelyingPartyTrust.AccessControlPolicyName, $this.AccessControlPolicyName);
             $Compliant = $false;
         }
+        if ($null -ne $this.EncryptionCertificateThumbprint -and (Get-OptCertificateThumbprint $RelyingPartyTrust.EncryptionCertificate) -ne $this.EncryptionCertificateThumbprint) {
+            Write-Verbose -Message ('The current EncryptionCertificateThumbprint property value ({0}) does not match the desired configuration ({1}).' -f (Get-OptCertificateThumbprint $RelyingPartyTrust.EncryptionCertificate), $this.EncryptionCertificateThumbprint);
+            $Compliant = $false;
+        }
+        if ($null -ne $this.RequestSigningCertificateThumbprint -and (Compare-Object @($RelyingPartyTrust.RequestSigningCertificate | Foreach-Object { $_.Thumbprint }) $this.RequestSigningCertificateThumbprint)) {
+            Write-Verbose -Message ('The current RequestSigningCertificateThumbprint property value ({0}) does not match the desired configuration ({1}).' -f `
+                (($RelyingPartyTrust.RequestSigningCertificate | Foreach-Object { $_.Thumbprint }) -join ', '), `
+                ($this.RequestSigningCertificateThumbprint -join ', '));
+            $Compliant = $false;
+        }
+        if ($null -ne $this.AlwaysRequireAuthentication -and $RelyingPartyTrust.AlwaysRequireAuthentication -ne $this.AlwaysRequireAuthentication) {
+            Write-Verbose -Message ('The current AlwaysRequireAuthentication property value ({0}) does not match the desired configuration ({1}).' -f $RelyingPartyTrust.AlwaysRequireAuthentication, $this.AlwaysRequireAuthentication);
+            $Compliant = $false;
+        }
+        if ($null -ne $this.EncryptedNameIdRequired -and $RelyingPartyTrust.EncryptedNameIdRequired -ne $this.EncryptedNameIdRequired) {
+            Write-Verbose -Message ('The current EncryptedNameIdRequired property value ({0}) does not match the desired configuration ({1}).' -f $RelyingPartyTrust.EncryptedNameIdRequired, $this.EncryptedNameIdRequired);
+            $Compliant = $false;
+        }
+        if ($null -ne $this.SignedSamlRequestsRequired -and $RelyingPartyTrust.SignedSamlRequestsRequired -ne $this.SignedSamlRequestsRequired) {
+            Write-Verbose -Message ('The current SignedSamlRequestsRequired property value ({0}) does not match the desired configuration ({1}).' -f $RelyingPartyTrust.SignedSamlRequestsRequired, $this.SignedSamlRequestsRequired);
+            $Compliant = $false;
+        }
 
         if ($Compliant) {
             Write-Verbose -Message ('ADFS Relying Party ({0}) is compliant' -f $this.Name);
@@ -481,7 +536,7 @@ class cADFSRelyingPartyTrust {
             Name = $this.Name;
         };
 
-        ### Add the ClaimsProviderName, only if it was specified by the user.
+        ### Add these values only if they were specified by the user.
         if ($this.ClaimsProviderName) {
             $RelyingPartyTrust.Add('ClaimsProviderName', $this.ClaimsProviderName);
         }
@@ -492,6 +547,30 @@ class cADFSRelyingPartyTrust {
 
         if ($this.AccessControlPolicyName) {
             $RelyingPartyTrust.Add('AccessControlPolicyName', $this.AccessControlPolicyName);
+        }
+
+        if ($null -ne $this.AlwaysRequireAuthentication) {
+            $RelyingPartyTrust.Add('AlwaysRequireAuthentication', $this.AlwaysRequireAuthentication);
+        }
+
+        if ($null -ne $this.EncryptedNameRequired) {
+            $RelyingPartyTrust.Add('EncryptedNameRequired', $this.EncryptedNameRequired);
+        }
+
+        if ($null -ne $this.SignedSamlRequestsRequired) {
+            $RelyingPartyTrust.Add('SignedSamlRequestsRequired', $this.SignedSamlRequestsRequired);
+        }
+
+        if ($null -ne $this.EncryptionCertificateThumbprint) {
+            if ($this.EncryptionCertificateThumbprint) {
+                $RelyingPartyTrust.Add('EncryptionCertificate', (Get-StoredCertificate $this.EncryptionCertificateThumbprint));
+            } else {
+                $RelyingPartyTrust.Add('EncryptionCertificate', $null);
+            }
+        }
+
+        if ($null -ne $this.RequestSigningCertificateThumbprint) {
+            $RelyingPartyTrust.Add('RequestSigningCertificate', ($this.RequestSigningCertificateThumbprint | Foreach-Object { Get-StoredCertificate $_ }));
         }
 
         ### Retrieve the existing Relying Party Configuration
@@ -1200,6 +1279,42 @@ function Convert-StringToHashtable {
 
     return [Hashtable] $data.SafeGetValue()
 } # end function Convert-StringToHashtable
+
+<#
+    .SYNOPSIS
+    Gets the thumbprint of a possibly $null certificate. If the certificate is $null, returns the empty string.
+
+#>
+function Get-OptCertificateThumbprint {
+    Param (
+        $Certificate
+    )
+
+    if ($Certificate) {
+        return $Certificate.Thumbprint;
+    } else {
+        return "";
+    }
+} # end function Get-OptCertificateThumbprint
+
+<#
+    .SYNOPSIS
+    Gets a certificate from the local stores. If the certificate doesn't exist, throw an exception.
+
+#>
+function Get-StoredCertificate {
+    Param (
+        [Parameter(Mandatory = $true)]
+        $Thumbprint
+    )
+
+    $Certificates = Find-Certificate -Thumbprint $Thumbprint -Store My;
+    if ($Certificates.length -eq 0) {
+        throw [System.ArgumentException]::New("Certificate $Thumbprint not found in the 'LocalMachine\My' store");
+    }
+
+    return $Certificates[0];
+} # end function Get-StoredCertificate
 
 return;
 
