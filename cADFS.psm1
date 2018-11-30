@@ -602,6 +602,16 @@ class cADFSRelyingPartyTrust {
         if (!$CurrentRelyingPartyTrust) {
             ### This code executes if the Relying Party Trust does not exist.
             Write-Verbose -Message ('The ADFS Relying Party Trust ({0}) does not exist. Creating it.' -f $this.Name);
+
+            # Add-AdfsRPT errors out when these arguments are $null, but they
+            # are required when trying to unconfigure these parameters with
+            # Set-AdfsRPT
+            @( 'WsFedEndpoint', 'EncryptionCertificate' ) | Foreach-Object {
+                if ($null -eq $RelyingPartyTrust[$_]) {
+                    $RelyingPartyTrust.Remove($_);
+                }
+            }
+
             Add-AdfsRelyingPartyTrust @RelyingPartyTrust;
         }
         else {
