@@ -203,7 +203,7 @@ class cADFSFarm {
                 Write-Verbose -Message 'ADFS Service Name doesn''t match the desired state.';
                 $Compliant = $false;
             }
-            else{
+            elseif ($this.AdminConfiguration) {
                 $AdfsConfig = Convert-StringToHashtable $this.AdminConfiguration
 
                 $AdfsConfig.GetEnumerator() | ForEach-Object{
