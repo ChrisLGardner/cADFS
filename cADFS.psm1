@@ -1,4 +1,4 @@
-﻿enum Ensure {
+enum Ensure {
     Absent;
     Present;
 }
@@ -927,7 +927,7 @@ class cADFSNode {
         Write-Verbose -Message 'Starting retrieving ADFS Farm configuration.';
 
         try {
-            $AdfsProperties = Get-AdfsProperties -ErrorAction Stop;
+            Get-AdfsSyncProperties -ErrorAction Stop;
         }
         catch {
             Write-Verbose -Message ('Error occurred while retrieving ADFS properties: {0}' -f $global:Error[0].Exception.Message);
@@ -940,31 +940,33 @@ class cADFSNode {
     [System.Boolean] Test() {
         # Assume compliance by default
         $Compliant = $true;
-
+        $SyncProperties = $null
 
         Write-Verbose -Message 'Testing for presence of Active Directory Federation Services (ADFS) farm.';
 
         try {
-            $Properties = Get-AdfsProperties -ErrorAction Stop;
+            $SyncProperties = Get-AdfsSyncProperties -ErrorAction Stop;
         }
         catch {
-            $Compliant = $false;
-            return $Compliant;
         }
 
         if ($this.Ensure -eq 'Present') {
             Write-Verbose -Message 'Checking for presence of ADFS Farm.';
-            # Check that this a node, not the server....
-            # if ($env:COMPUTERNAME -ne $Properties.HostName) {
-            #     Write-Verbose -Message 'ADFS Service Name doesn''t match the desired state.';
-            #     $Compliant = $false;
-            # }
+
+            if ($SyncProperties -eq $null) {
+                $Compliant = $false
+            }
+
+            if ($SyncProperties.PrimaryComputerName -ne $this.PrimaryADFSServer) {
+                $Complaint = $false
+            }
+
+            # TODO -- Add CertificateSubject, CertificateThumbprint, and ServiceCredential
         }
 
         if ($this.Ensure -eq 'Absent') {
             Write-Verbose -Message 'Checking for absence of ADFS Farm.';
-            if ($Properties) {
-                Write-Verbose -Message
+            if ($SyncProperties -ne $null) {
                 $Compliant = $false;
             }
         }
