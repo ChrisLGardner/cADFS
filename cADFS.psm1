@@ -883,7 +883,8 @@ function AddADFSNode {
 
     Add-AdfsFarmNode -CertificateThumbprint:$CertificateThumbprint `
     -ServiceAccountCredential $serviceCredential `
-    -PrimaryComputerName $PrimaryADFSServer
+    -PrimaryComputerName $PrimaryADFSServer `
+    -OverwriteConfiguration $true
 
     Write-Verbose -Message ('Leaving function {0}' -f $CmdletName);
 }
